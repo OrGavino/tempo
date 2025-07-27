@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"flag"
 	"fmt"
 	"io"
 	"net/http"
@@ -34,7 +35,20 @@ type Weather struct {
 }
 
 func main() {
-	res, err := http.Get("https://api.weatherapi.com/v1/forecast.json?key=f7df7cc30438443f98c162015252207&q=auto:ip&days=1&aqi=no&alerts=no")
+	tomorrow := flag.Bool("tomorrow", false, "Get tomorrow's weather forecast")
+	flag.Parse()
+
+	days := 1
+	if *tomorrow {
+		days = 2
+	}
+
+	url := fmt.Sprintf(
+		"https://api.weatherapi.com/v1/forecast.json?key=f7df7cc30438443f98c162015252207&q=auto:ip&days=%d&aqi=no&alerts=no",
+		days,
+	)
+
+	res, err := http.Get(url)
 	if err != nil {
 		panic(err)
 	}
@@ -49,17 +63,34 @@ func main() {
 		panic(err)
 	}
 
-	// fmt.Println(string(body))
 	var weather Weather
 	err = json.Unmarshal(body, &weather)
 	if err != nil {
 		panic(err)
 	}
 
-	location, current, hours := weather.Location, weather.Current, weather.Forecast.Forecastday[0].Hour
+	forecastIndex := 0
+	if *tomorrow {
+		forecastIndex = 1
+	}
+
+	label := "Today"
+	if *tomorrow {
+		label = "Tomorrow"
+	}
+
+	if forecastIndex >= len(weather.Forecast.Forecastday) {
+		panic("Forecast for requested day is not available")
+	}
+
+	if forecastIndex == 1 {
+		fmt.Printf("%s weather will be:\n", label)
+	}
+
+	location, current, hours := weather.Location, weather.Current, weather.Forecast.Forecastday[forecastIndex].Hour
 
 	fmt.Printf(
-		"%s, %s: %.0fC, %s\n",
+		"🕒 %s, %s: %.0fC, %s\n",
 		location.Name,
 		location.Country,
 		current.TempC,
